@@ -1,0 +1,3 @@
+"""
+Compliance app initialization.
+"""

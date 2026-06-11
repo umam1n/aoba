@@ -1,0 +1,62 @@
+# === Python / Django ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+.venv/
+venv/
+env/
+*.sqlite3
+db.sqlite3
+*.log
+local_settings.py
+media/
+
+# === Node.js / Next.js ===
+node_modules/
+.next/
+out/
+.vercel
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# === Environment ===
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# === IDE ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# === Test Data (Kaggle) ===
+scripts/data/
+ml/seed_data/*.csv
+ml/seed_data/*.zip
+
+# === Model Artifacts ===
+models/
+*.pt
+*.pth
+*.pkl
+*.joblib
+
+# === Docker ===
+docker-compose.override.yml
+
+# === Coverage ===
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover

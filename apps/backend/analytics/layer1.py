@@ -176,7 +176,7 @@ class Layer1Calculator:
         avg_count = avg.get("avg_count") or 1.0
 
         # Rough estimate: company_tenure / promo_count per employee
-        employees = Employee.objects.filter(company_id=company_id, is_active=True)
+        employees = Employee.objects.filter(company_id=company_id, employment_status='active')
         if not employees.exists():
             return 24.0  # sensible default
 
@@ -197,14 +197,14 @@ class Layer1Calculator:
         """
         last_change = (
             ManagerChangeLog.objects.filter(employee=employee)
-            .order_by("-change_date")
+            .order_by("-changed_at")
             .first()
         )
 
         if not last_change:
             return 10  # no recorded change — stable
 
-        days_since = (timezone.now().date() - last_change.change_date).days
+        days_since = (timezone.now().date() - last_change.changed_at).days
 
         if days_since < 30:
             return 70
@@ -237,7 +237,7 @@ class Layer1Calculator:
             return 0
 
         exited = peers.filter(
-            is_active=False,
+            employment_status='exited',
             exit_date__gte=six_months_ago,
         ).count()
 
@@ -314,19 +314,13 @@ class Layer1Calculator:
     def _sum_leave_days(
         qs: QuerySet, start: Any, end: Any
     ) -> float:
-        """Sum ``days_taken`` from LeaveRecord queryset in the given window."""
-        agg = qs.filter(
-            start_date__gte=start,
-            start_date__lt=end,
-        ).aggregate(total=pd.compat.import_optional_dependency("django.db.models").Sum("days_taken"))
-        # Avoid importing Sum above through a separate path — use direct import
-        # below as a cleaner alternative.
+        """Sum ``days_count`` from LeaveRecord queryset in the given window."""
         from django.db.models import Sum as DjSum
 
         result = qs.filter(
             start_date__gte=start,
             start_date__lt=end,
-        ).aggregate(total=DjSum("days_taken"))
+        ).aggregate(total=DjSum("days_count"))
         return float(result["total"] or 0)
 
     # ------------------------------------------------------------------ #
@@ -368,7 +362,7 @@ class Layer1Calculator:
         """
         employees = Employee.objects.filter(
             company_id=company_id,
-            is_active=True,
+            employment_status='active',
         ).select_related("company")
 
         if not employees.exists():

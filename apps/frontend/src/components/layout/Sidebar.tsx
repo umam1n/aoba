@@ -19,6 +19,7 @@ const navigation = [
   { name: 'Risk Analytics', href: '/risk', icon: Activity },
   { name: 'Department Deep Dive', href: '/overview/department', icon: BarChart3 },
   { name: 'Employee Directory', href: '/employees', icon: Users },
+  { name: 'Data Import', href: '/import', icon: FileSpreadsheet },
   { name: 'Surveys', href: '/surveys', icon: FileSpreadsheet },
   { name: 'Compliance & Charter', href: '/compliance', icon: ShieldCheck },
   { name: 'Settings', href: '/settings', icon: Settings },

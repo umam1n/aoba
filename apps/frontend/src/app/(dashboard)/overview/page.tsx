@@ -1,13 +1,15 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { GlassPanel, cn } from '@/components/ui/GlassPanel';
 import { Badge } from '@/components/ui/Badge';
-import { AlertTriangle, TrendingDown, TrendingUp, Users, Activity } from 'lucide-react';
-import { 
+import { AnomalyDrawer } from '@/components/analytics/AnomalyDrawer';
+import { AlertTriangle, TrendingUp, Users, Activity } from 'lucide-react';
+import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  BarChart, Bar, Legend
+  BarChart, Bar, Legend,
 } from 'recharts';
+import type { AnomalyFlag } from '@/lib/types';
 
 const attritionData = [
   { month: 'Jan', rate: 2.1, predicted: 2.1 },
@@ -20,18 +22,81 @@ const attritionData = [
 
 const riskByDept = [
   { name: 'Engineering', high: 12, medium: 28, low: 80 },
-  { name: 'Sales', high: 18, medium: 22, low: 45 },
-  { name: 'Marketing', high: 5, medium: 15, low: 30 },
-  { name: 'Product', high: 3, medium: 10, low: 25 },
+  { name: 'Sales',       high: 18, medium: 22, low: 45 },
+  { name: 'Marketing',   high: 5,  medium: 15, low: 30 },
+  { name: 'Product',     high: 3,  medium: 10, low: 25 },
 ];
 
-const anomalies = [
-  { id: 1, type: 'CRITICAL', title: 'Sales Team Attrition Spike', desc: 'Manager JD lost 3 team members in 30 days', time: '2 hours ago' },
-  { id: 2, type: 'WARNING', title: 'Engineering Survey Drop', desc: 'Response rate dropped 35% MoM', time: '1 day ago' },
-  { id: 3, type: 'ALERT', title: 'Leave Anomaly: Product', desc: 'Sudden spike in sick leave (+2.5σ)', time: '2 days ago' },
+const mockAnomalies: AnomalyFlag[] = [
+  {
+    id: 'anm-001',
+    company_id: 'c1',
+    anomaly_type: 'team_attrition',
+    severity: 'critical',
+    entity_type: 'manager',
+    entity_id: 'mgr-042',
+    entity_name: 'Manager JD (Sales)',
+    description: { team_size: 8, exits_6mo: 3, attrition_rate_pct: 37.5 },
+    metric_value: 37.5,
+    threshold_value: 20.0,
+    detected_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    is_active: true,
+  },
+  {
+    id: 'anm-002',
+    company_id: 'c1',
+    anomaly_type: 'response_rate_drop',
+    severity: 'warning',
+    entity_type: 'department',
+    entity_id: 'Engineering',
+    entity_name: 'Engineering',
+    description: { department: 'Engineering', previous_month_responses: 85, current_month_responses: 55, drop_pct: 35.3 },
+    metric_value: 55,
+    threshold_value: 85,
+    detected_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    is_active: true,
+  },
+  {
+    id: 'anm-003',
+    company_id: 'c1',
+    anomaly_type: 'leave_spike',
+    severity: 'alert',
+    entity_type: 'department',
+    entity_id: 'Product',
+    entity_name: 'Product',
+    description: { department: 'Product', current_month_leave_days: 48, baseline_mean: 18.2, baseline_std: 4.6, sigma_deviation: 2.56 },
+    metric_value: 48,
+    threshold_value: 18.2,
+    detected_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    is_active: true,
+  },
 ];
+
+const SEVERITY_STYLES = {
+  critical: 'bg-red-500 pulse-glow',
+  alert:    'bg-amber-500',
+  warning:  'bg-blue-500',
+};
+
+function timeAgo(iso: string): string {
+  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
 
 export default function OverviewPage() {
+  const [selectedAnomaly, setSelectedAnomaly] = useState<AnomalyFlag | null>(null);
+  const [anomalies, setAnomalies] = useState<AnomalyFlag[]>(mockAnomalies);
+
+  const handleResolve = (id: string) => {
+    setAnomalies(prev =>
+      prev.map(a => a.id === id ? { ...a, is_active: false, resolved_at: new Date().toISOString() } : a)
+    );
+  };
+
+  const activeAnomalies = anomalies.filter(a => a.is_active);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -90,7 +155,7 @@ export default function OverviewPage() {
               <TrendingUp className="w-4 h-4 mr-1" /> +2%
             </span>
           </div>
-          <p className="text-xs text-gray-500 mt-2">Layer 4 DNN Model Active</p>
+          <p className="text-xs text-gray-500 mt-2">Layer 4 XGBoost Model Active</p>
         </GlassPanel>
       </div>
 
@@ -103,22 +168,22 @@ export default function OverviewPage() {
               <AreaChart data={attritionData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorRate" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                    <stop offset="5%"  stopColor="#3b82f6" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="colorPred" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
+                    <stop offset="5%"  stopColor="#f59e0b" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
                 <XAxis dataKey="month" stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `${val}%`} />
-                <Tooltip 
+                <YAxis stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} />
+                <Tooltip
                   contentStyle={{ backgroundColor: '#111827', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff' }}
                   itemStyle={{ color: '#fff' }}
                 />
-                <Area type="monotone" dataKey="rate" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorRate)" name="Actual %" />
+                <Area type="monotone" dataKey="rate"      stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorRate)" name="Actual %" />
                 <Area type="monotone" dataKey="predicted" stroke="#f59e0b" strokeWidth={3} strokeDasharray="5 5" fillOpacity={1} fill="url(#colorPred)" name="Forecast %" />
               </AreaChart>
             </ResponsiveContainer>
@@ -129,22 +194,37 @@ export default function OverviewPage() {
         <GlassPanel className="p-6 flex flex-col">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-lg font-semibold text-white">Layer 3 Anomalies</h3>
-            <Badge variant="danger">3 Active</Badge>
+            <Badge variant={activeAnomalies.length > 0 ? 'danger' : 'success'}>
+              {activeAnomalies.length} Active
+            </Badge>
           </div>
-          <div className="flex-1 space-y-4">
+          <div className="flex-1 space-y-3">
             {anomalies.map((anomaly) => (
-              <div key={anomaly.id} className="p-4 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer relative overflow-hidden group">
+              <button
+                key={anomaly.id}
+                onClick={() => setSelectedAnomaly(anomaly)}
+                className={cn(
+                  'w-full text-left p-4 rounded-lg border transition-all cursor-pointer relative overflow-hidden group',
+                  anomaly.is_active
+                    ? 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
+                    : 'bg-white/2 border-white/5 opacity-50'
+                )}
+              >
                 <div className={cn(
-                  "absolute left-0 top-0 bottom-0 w-1",
-                  anomaly.type === 'CRITICAL' ? "bg-red-500 pulse-glow" : 
-                  anomaly.type === 'WARNING' ? "bg-amber-500" : "bg-blue-500"
+                  'absolute left-0 top-0 bottom-0 w-1',
+                  SEVERITY_STYLES[anomaly.severity]
                 )} />
                 <div className="flex justify-between items-start mb-1 ml-2">
-                  <span className="text-sm font-medium text-white group-hover:text-blue-400 transition-colors">{anomaly.title}</span>
-                  <span className="text-xs text-gray-500">{anomaly.time}</span>
+                  <span className="text-sm font-medium text-white group-hover:text-blue-400 transition-colors">
+                    {anomaly.entity_name}
+                  </span>
+                  <span className="text-xs text-gray-500">{timeAgo(anomaly.detected_at)}</span>
                 </div>
-                <p className="text-xs text-gray-400 ml-2">{anomaly.desc}</p>
-              </div>
+                <p className="text-xs text-gray-400 ml-2 capitalize">
+                  {anomaly.anomaly_type.replace(/_/g, ' ')}
+                  {!anomaly.is_active && <span className="ml-2 text-emerald-500">✓ resolved</span>}
+                </p>
+              </button>
             ))}
           </div>
         </GlassPanel>
@@ -159,18 +239,24 @@ export default function OverviewPage() {
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" horizontal={true} vertical={false} />
               <XAxis type="number" stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
               <YAxis dataKey="name" type="category" stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
-              <Tooltip 
+              <Tooltip
                 cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                 contentStyle={{ backgroundColor: '#111827', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff' }}
               />
               <Legend wrapperStyle={{ paddingTop: '20px' }} />
-              <Bar dataKey="high" name="High Risk" stackId="a" fill="#ef4444" radius={[0, 0, 0, 0]} />
+              <Bar dataKey="high"   name="High Risk"   stackId="a" fill="#ef4444" radius={[0, 0, 0, 0]} />
               <Bar dataKey="medium" name="Medium Risk" stackId="a" fill="#f59e0b" radius={[0, 0, 0, 0]} />
-              <Bar dataKey="low" name="Low Risk" stackId="a" fill="#10b981" radius={[0, 4, 4, 0]} />
+              <Bar dataKey="low"    name="Low Risk"    stackId="a" fill="#10b981" radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
       </GlassPanel>
+
+      <AnomalyDrawer
+        anomaly={selectedAnomaly}
+        onClose={() => setSelectedAnomaly(null)}
+        onResolve={handleResolve}
+      />
     </div>
   );
 }

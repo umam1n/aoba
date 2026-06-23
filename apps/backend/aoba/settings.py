@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     'surveys',
     'billing',
     'compliance',
+    'projects',
 ]
 
 MIDDLEWARE = [

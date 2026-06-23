@@ -12,4 +12,5 @@ urlpatterns = [
     path('api/v1/surveys/', include('surveys.urls')),
     path('api/v1/billing/', include('billing.urls')),
     path('api/v1/compliance/', include('compliance.urls')),
+    path('api/v1/projects/', include('projects.urls')),
 ]

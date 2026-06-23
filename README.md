@@ -7,7 +7,8 @@ AOBA is a predictive people analytics platform targeting SMEs (50–500 employee
 The platform offers a scalable architecture structured in progressive analytical layers:
 - **Layer 1:** Structural HR Signals
 - **Layer 3:** Rule-based Anomaly Detection
-- **Layer 4:** Predictive Attrition (Feedforward Deep Neural Network with SHAP integration)
+- **Layer 4:** Predictive Attrition (XGBoost Classifier + SHAP explainability)
+- **Layer 6:** Workforce Load Analysis, Project Ingestion, & NLP Task Friction Engine (Phase 3)
 - **Layer 7:** Talent Cards
 - **Layer 8:** AI Displacement Forecasting
 
@@ -17,8 +18,10 @@ The platform offers a scalable architecture structured in progressive analytical
 - Python 3.10+
 - Django 5.x & Django REST Framework (DRF)
 - Celery & Redis (Async task queuing)
+- XGBoost & SHAP (Machine Learning pipeline)
 - SQLite (Local Dev) / Supabase PostgreSQL (Production)
 - **Data Security:** `cryptography` (Fernet) for PII column-level encryption (UU PDP Compliance).
+- **Bronze Layer RLS:** Webhook payloads secured via PostgreSQL Row-Level Security scoped strictly to company ID.
 
 ### Frontend (Next.js Application)
 - Next.js 14+ (App Router)

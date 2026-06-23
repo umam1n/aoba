@@ -38,9 +38,9 @@ class AnomalyDetector:
         - CRITICAL — immediate action required
     """
 
-    SEVERITY_WARNING = "WARNING"
-    SEVERITY_ALERT = "ALERT"
-    SEVERITY_CRITICAL = "CRITICAL"
+    SEVERITY_WARNING = "warning"
+    SEVERITY_ALERT = "alert"
+    SEVERITY_CRITICAL = "critical"
 
     # ================================================================== #
     # Public API                                                           #
@@ -99,7 +99,7 @@ class AnomalyDetector:
         rule_type = "response_rate_drop"
 
         departments = (
-            Employee.objects.filter(company_id=company_id, is_active=True)
+            Employee.objects.filter(company_id=company_id, employment_status='active')
             .values_list("department", flat=True)
             .distinct()
         )
@@ -131,11 +131,12 @@ class AnomalyDetector:
             if drop_pct > 0.30:
                 flag = self._upsert_flag(
                     company_id=company_id,
-                    rule_type=rule_type,
+                    anomaly_type=rule_type,
                     entity_type="department",
                     entity_id=dept,
+                    entity_name=dept,
                     severity=self.SEVERITY_WARNING,
-                    detail={
+                    description={
                         "department": dept,
                         "previous_month_responses": prev_count,
                         "current_month_responses": curr_count,
@@ -179,20 +180,22 @@ class AnomalyDetector:
                 continue
 
             exited = team.filter(
-                is_active=False,
+                employment_status='exited',
                 exit_date__gte=six_months_ago,
             ).count()
 
             rate = exited / total
 
             if rate > 0.20:
+                manager_name = Employee.objects.filter(id=manager_id).values_list('full_name', flat=True).first() or str(manager_id)
                 flag = self._upsert_flag(
                     company_id=company_id,
-                    rule_type=rule_type,
+                    anomaly_type=rule_type,
                     entity_type="manager",
                     entity_id=str(manager_id),
+                    entity_name=manager_name,
                     severity=self.SEVERITY_CRITICAL,
-                    detail={
+                    description={
                         "manager_id": manager_id,
                         "team_size": total,
                         "exits_6mo": exited,
@@ -228,7 +231,7 @@ class AnomalyDetector:
             )
             .exclude(employee__manager__isnull=True)
             .values("employee__manager_id")
-            .annotate(avg_score=Avg("score"))
+            .annotate(avg_score=Avg("response_value"))
         )
 
         if not manager_scores:
@@ -247,13 +250,15 @@ class AnomalyDetector:
                 continue
 
             if avg < p25:
+                manager_name = Employee.objects.filter(id=manager_id).values_list('full_name', flat=True).first() or str(manager_id)
                 flag = self._upsert_flag(
                     company_id=company_id,
-                    rule_type=rule_type,
+                    anomaly_type=rule_type,
                     entity_type="manager",
                     entity_id=str(manager_id),
+                    entity_name=manager_name,
                     severity=self.SEVERITY_WARNING,
-                    detail={
+                    description={
                         "manager_id": manager_id,
                         "team_avg_score": round(float(avg), 2),
                         "company_p25": round(p25, 2),
@@ -282,7 +287,7 @@ class AnomalyDetector:
         flags: list[AnomalyFlag] = []
 
         departments = (
-            Employee.objects.filter(company_id=company_id, is_active=True)
+            Employee.objects.filter(company_id=company_id, employment_status='active')
             .values_list("department", flat=True)
             .distinct()
         )
@@ -320,7 +325,7 @@ class AnomalyDetector:
                     start_date__gte=one_month_ago,
                     start_date__lte=now,
                 )
-                .aggregate(total=Sum("days_taken"))
+                .aggregate(total=Sum("days_count"))
                 .get("total")
                 or 0
             )
@@ -332,11 +337,12 @@ class AnomalyDetector:
             if std > 0 and current_total > mean + 2 * std:
                 flag = self._upsert_flag(
                     company_id=company_id,
-                    rule_type=rule_type,
+                    anomaly_type=rule_type,
                     entity_type="department",
                     entity_id=dept,
+                    entity_name=dept,
                     severity=self.SEVERITY_ALERT,
-                    detail={
+                    description={
                         "department": dept,
                         "current_month_leave_days": float(current_total),
                         "baseline_mean": round(mean, 2),
@@ -363,7 +369,7 @@ class AnomalyDetector:
         records = qs.filter(
             start_date__gte=start_date,
             start_date__lt=end_date,
-        ).values_list("start_date", "days_taken")
+        ).values_list("start_date", "days_count")
 
         from collections import defaultdict
 
@@ -377,22 +383,24 @@ class AnomalyDetector:
     @staticmethod
     def _upsert_flag(
         company_id: int,
-        rule_type: str,
+        anomaly_type: str,
         entity_type: str,
         entity_id: str,
+        entity_name: str,
         severity: str,
-        detail: dict,
+        description: dict,
     ) -> AnomalyFlag:
         """Create or update an AnomalyFlag record."""
         flag, created = AnomalyFlag.objects.update_or_create(
             company_id=company_id,
-            rule_type=rule_type,
+            anomaly_type=anomaly_type,
             entity_type=entity_type,
             entity_id=entity_id,
-            is_resolved=False,
+            is_active=True,
             defaults={
+                "entity_name": entity_name,
                 "severity": severity,
-                "detail": detail,
+                "description": description,
                 "detected_at": timezone.now(),
             },
         )
@@ -400,7 +408,7 @@ class AnomalyDetector:
         logger.debug(
             "%s AnomalyFlag: rule=%s entity=%s/%s severity=%s",
             action,
-            rule_type,
+            anomaly_type,
             entity_type,
             entity_id,
             severity,
@@ -412,11 +420,11 @@ class AnomalyDetector:
         """Resolve any open flags for a rule+entity that no longer triggers."""
         updated = AnomalyFlag.objects.filter(
             company_id=company_id,
-            rule_type=rule_type,
+            anomaly_type=rule_type,
             entity_id=entity_id,
-            is_resolved=False,
+            is_active=True,
         ).update(
-            is_resolved=True,
+            is_active=False,
             resolved_at=timezone.now(),
         )
         if updated:

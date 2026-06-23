@@ -8,6 +8,7 @@ import uuid
 
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 from companies.models import Company
 from employees.models import Employee
@@ -16,7 +17,7 @@ from employees.models import Employee
 class RiskScore(models.Model):
     """
     Per-employee attrition risk score. Computed nightly by the risk engine
-    (rule-based in MVP, DNN in Phase 2). Contains the overall score,
+    (rule-based in MVP, XGBoost + SHAP in Phase 2). Contains the overall score,
     tier classification, component breakdowns, and top contributing factors.
     """
 
@@ -29,7 +30,7 @@ class RiskScore(models.Model):
 
     SCORING_METHOD_CHOICES = [
         ('rule_based', 'Rule-Based'),
-        ('dnn', 'Deep Neural Network'),
+        ('xgboost', 'XGBoost Classifier'),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -66,6 +67,7 @@ class RiskScore(models.Model):
 
     class Meta:
         ordering = ['-calculated_at']
+        unique_together = ['employee', 'company']
         indexes = [
             models.Index(fields=['company', 'risk_tier']),
             models.Index(fields=['company', '-overall_score']),
@@ -145,10 +147,10 @@ class AnomalyFlag(models.Model):
     entity_type = models.CharField(max_length=20, choices=ENTITY_TYPE_CHOICES)
     entity_id = models.CharField(max_length=255)
     entity_name = models.CharField(max_length=255)
-    description = models.TextField()
+    description = models.JSONField(default=dict)
     metric_value = models.DecimalField(max_digits=8, decimal_places=3, null=True, blank=True)
     threshold_value = models.DecimalField(max_digits=8, decimal_places=3, null=True, blank=True)
-    detected_at = models.DateTimeField(auto_now_add=True)
+    detected_at = models.DateTimeField(default=timezone.now)
     resolved_at = models.DateTimeField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
 

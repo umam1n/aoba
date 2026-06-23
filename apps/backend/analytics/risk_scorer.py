@@ -139,6 +139,7 @@ class RuleBasedRiskScorer:
             try:
                 RiskScore.objects.update_or_create(
                     employee_id=employee_id,
+                    company_id=company_id,
                     defaults={
                         "overall_score": scored["overall_score"],
                         "risk_tier": scored["risk_tier"],

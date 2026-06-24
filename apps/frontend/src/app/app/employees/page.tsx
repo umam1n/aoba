@@ -1,26 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { EmployeeDrawer } from '@/components/employees/EmployeeDrawer';
-import { Search, Upload, Filter, Download, X, ChevronRight } from 'lucide-react';
+import { Search, Upload, Filter, Download, X, ChevronRight, Loader2 } from 'lucide-react';
 import type { Employee } from '@/lib/types';
-
-const mockEmployees: Employee[] = [
-  { id: '1', company_id: 'c1', employee_code: 'EMP-001', full_name: 'Alice Smith', email: 'alice@aoba.inc', department: 'Engineering', division: 'Platform', role_title: 'Senior Engineer', role_level: 'L4', manager_id: '5', hire_date: '2022-03-01', employment_status: 'active', created_at: '2022-03-01', updated_at: '2026-06-01', tenure_months: 51 },
-  { id: '2', company_id: 'c1', employee_code: 'EMP-002', full_name: 'Bob Johnson', email: 'bob@aoba.inc', department: 'Sales', division: 'Enterprise', role_title: 'Account Executive', role_level: 'L3', hire_date: '2023-06-15', employment_status: 'active', created_at: '2023-06-15', updated_at: '2026-06-01', tenure_months: 36 },
-  { id: '3', company_id: 'c1', employee_code: 'EMP-003', full_name: 'Carol Williams', email: 'carol@aoba.inc', department: 'Marketing', role_title: 'Marketing Manager', role_level: 'L5', hire_date: '2020-11-01', employment_status: 'on_leave', created_at: '2020-11-01', updated_at: '2026-06-01', tenure_months: 67 },
-  { id: '4', company_id: 'c1', employee_code: 'EMP-004', full_name: 'David Brown', email: 'david@aoba.inc', department: 'Engineering', division: 'Mobile', role_title: 'Staff Engineer', role_level: 'L5', hire_date: '2019-02-15', employment_status: 'active', created_at: '2019-02-15', updated_at: '2026-06-01', tenure_months: 88 },
-  { id: '5', company_id: 'c1', employee_code: 'EMP-005', full_name: 'Eve Davis', email: 'eve@aoba.inc', department: 'Product', role_title: 'Senior PM', role_level: 'L4', hire_date: '2021-07-01', employment_status: 'active', created_at: '2021-07-01', updated_at: '2026-06-01', tenure_months: 59 },
-];
-
-const mockImports = [
-  { id: 'imp-1', date: '2026-06-11 10:23', filename: 'q2_compensation.csv', status: 'completed' as const, rows_total: 412, rows_imported: 412, rows_skipped: 0, errors: [], file_hash: '', file_type: 'compensation_history' as const, company_id: 'c1', uploaded_at: '2026-06-11' },
-  { id: 'imp-2', date: '2026-06-01 09:00', filename: 'new_hires_june.csv', status: 'completed' as const, rows_total: 15, rows_imported: 15, rows_skipped: 0, errors: [], file_hash: '', file_type: 'employees' as const, company_id: 'c1', uploaded_at: '2026-06-01' },
-  { id: 'imp-3', date: '2026-05-15 14:45', filename: 'org_chart_update.csv', status: 'failed' as const, rows_total: 0, rows_imported: 0, rows_skipped: 0, errors: [{ row: 1, field: 'manager_id', message: 'Unknown manager' }], file_hash: '', file_type: 'employees' as const, company_id: 'c1', uploaded_at: '2026-05-15' },
-];
+import { api } from '@/lib/api';
 
 const STATUS_LABELS: Record<Employee['employment_status'], string> = {
   active: 'Active',
@@ -32,8 +19,25 @@ export default function EmployeesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showImportModal, setShowImportModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filtered = mockEmployees.filter(e =>
+  useEffect(() => {
+    async function fetchEmployees() {
+      setLoading(true);
+      const { data, error } = await api.get<{ results: Employee[] }>('/employees/');
+      if (data && data.results) {
+        setEmployees(data.results);
+      } else {
+        console.error('Failed to fetch employees:', error);
+      }
+      setLoading(false);
+    }
+    fetchEmployees();
+  }, []);
+
+  const filtered = employees.filter(e =>
     e.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     e.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
     e.employee_code.toLowerCase().includes(searchTerm.toLowerCase())
@@ -89,42 +93,57 @@ export default function EmployeesPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((emp) => (
-                  <tr
-                    key={emp.id}
-                    className="border-b border-white/5 hover:bg-white/5 cursor-pointer group transition-colors"
-                    onClick={() => setSelectedEmployee(emp)}
-                  >
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500/40 to-cyan-500/40 flex items-center justify-center text-white text-xs font-bold shrink-0">
-                          {emp.full_name.charAt(0)}
-                        </div>
-                        <div>
-                          <div className="font-medium text-white">{emp.full_name}</div>
-                          <div className="text-xs text-gray-500">{emp.employee_code}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div>{emp.department}</div>
-                      {emp.division && <div className="text-xs text-gray-500">{emp.division}</div>}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div>{emp.role_title}</div>
-                      <div className="text-xs text-gray-500">{emp.role_level}</div>
-                    </td>
-                    <td className="px-4 py-3">{emp.tenure_months}mo</td>
-                    <td className="px-4 py-3">
-                      <Badge variant={emp.employment_status === 'active' ? 'success' : emp.employment_status === 'on_leave' ? 'warning' : 'danger'}>
-                        {STATUS_LABELS[emp.employment_status]}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3">
-                      <ChevronRight className="w-4 h-4 text-gray-600 group-hover:text-gray-300 transition-colors" />
+                {loading ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                      <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
+                      Loading employees...
                     </td>
                   </tr>
-                ))}
+                ) : filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                      No employees found.
+                    </td>
+                  </tr>
+                ) : (
+                  filtered.map((emp) => (
+                    <tr
+                      key={emp.id}
+                      className="border-b border-white/5 hover:bg-white/5 cursor-pointer group transition-colors"
+                      onClick={() => setSelectedEmployee(emp)}
+                    >
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500/40 to-cyan-500/40 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                            {emp.full_name.charAt(0)}
+                          </div>
+                          <div>
+                            <div className="font-medium text-white">{emp.full_name}</div>
+                            <div className="text-xs text-gray-500">{emp.employee_code}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div>{emp.department}</div>
+                        {emp.division && <div className="text-xs text-gray-500">{emp.division}</div>}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div>{emp.role_title}</div>
+                        <div className="text-xs text-gray-500">{emp.role_level}</div>
+                      </td>
+                      <td className="px-4 py-3">{emp.tenure_months || '-'} mo</td>
+                      <td className="px-4 py-3">
+                        <Badge variant={emp.employment_status === 'active' ? 'success' : emp.employment_status === 'on_leave' ? 'warning' : 'danger'}>
+                          {STATUS_LABELS[emp.employment_status]}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3">
+                        <ChevronRight className="w-4 h-4 text-gray-600 group-hover:text-gray-300 transition-colors" />
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -133,15 +152,9 @@ export default function EmployeesPage() {
         <GlassPanel className="p-6">
           <h3 className="text-lg font-semibold text-white mb-4">Import History</h3>
           <div className="space-y-4">
-            {mockImports.map(imp => (
-              <div key={imp.id} className="border-l-2 border-white/10 pl-3 py-1">
-                <div className="flex justify-between items-start">
-                  <span className="text-sm text-white truncate w-32" title={imp.filename}>{imp.filename}</span>
-                  <Badge variant={imp.status === 'completed' ? 'success' : 'danger'} className="text-[10px] px-1 py-0 capitalize">{imp.status}</Badge>
-                </div>
-                <div className="text-xs text-gray-500 mt-1">{imp.date} &bull; {imp.rows_total} rows</div>
-              </div>
-            ))}
+            <div className="text-sm text-gray-400">
+              API integration pending for import logs.
+            </div>
           </div>
         </GlassPanel>
       </div>

@@ -64,6 +64,14 @@ class CompanyScopedPermission(permissions.BasePermission):
         if not company:
             return False
 
-        # Verify user belongs to the requested company
-        user_company_id = request.supabase_claims.get('app_metadata', {}).get('company_id')
-        return str(company.id) == str(user_company_id)
+        # If supabase_claims is available, use it (production/JWT flow)
+        if hasattr(request, 'supabase_claims'):
+            user_company_id = request.supabase_claims.get('app_metadata', {}).get('company_id')
+            return str(company.id) == str(user_company_id)
+        
+        # Fallback for LocalAuthMiddleware in DEBUG mode
+        from django.conf import settings
+        if settings.DEBUG and request.user.is_authenticated:
+            return request.user.company_memberships.filter(company=company).exists()
+
+        return False

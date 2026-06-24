@@ -19,6 +19,7 @@ class ApiClient {
       'Content-Type': 'application/json',
       'Authorization': token ? `Bearer ${token}` : '',
       'X-Company-ID': companyId,
+      'X-Mock-Email': process.env.NODE_ENV === 'development' ? 'admin@acmecorp.com' : '',
     };
   }
 

@@ -18,7 +18,7 @@ function LoginForm() {
   const [error, setError]         = useState('');
   const router       = useRouter();
   const searchParams = useSearchParams();
-  const from         = searchParams.get('from') || '/overview';
+  const from         = searchParams.get('from') || '/app/overview';
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();

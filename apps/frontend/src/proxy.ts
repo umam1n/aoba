@@ -26,7 +26,7 @@ export function proxy(request: NextRequest) {
 
   if (!isAuthenticated) {
     const loginUrl = new URL('/login', request.url);
-    loginUrl.searchParams.set('from', pathname);
+    loginUrl.searchParams.set('from', pathname === '/' ? '/app/overview' : pathname);
     return NextResponse.redirect(loginUrl);
   }
 

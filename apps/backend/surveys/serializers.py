@@ -37,7 +37,7 @@ class PulseSurveySerializer(serializers.ModelSerializer):
     class Meta:
         model = PulseSurvey
         fields = [
-            'id', 'company', 'title', 'description', 'status',
+            'id', 'company', 'title', 'description', 'status', 'target_audience',
             'starts_at', 'ends_at', 'created_by', 'created_at',
             'questions', 'response_count', 'unique_respondents',
         ]

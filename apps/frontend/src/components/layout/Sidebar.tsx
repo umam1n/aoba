@@ -15,14 +15,14 @@ import {
 import { cn } from '../ui/GlassPanel';
 
 const navigation = [
-  { name: 'Overview', href: '/overview', icon: LayoutDashboard },
-  { name: 'Risk Analytics', href: '/risk', icon: Activity },
-  { name: 'Department Deep Dive', href: '/overview/department', icon: BarChart3 },
-  { name: 'Employee Directory', href: '/employees', icon: Users },
-  { name: 'Data Import', href: '/import', icon: FileSpreadsheet },
-  { name: 'Surveys', href: '/surveys', icon: FileSpreadsheet },
-  { name: 'Compliance & Charter', href: '/compliance', icon: ShieldCheck },
-  { name: 'Settings', href: '/settings', icon: Settings },
+  { name: 'Overview', href: '/app/overview', icon: LayoutDashboard },
+  { name: 'Risk Analytics', href: '/app/risk', icon: Activity },
+  { name: 'Department Deep Dive', href: '/app/overview/department', icon: BarChart3 },
+  { name: 'Employee Directory', href: '/app/employees', icon: Users },
+  { name: 'Data Import', href: '/app/import', icon: FileSpreadsheet },
+  { name: 'Surveys', href: '/app/surveys', icon: FileSpreadsheet },
+  { name: 'Compliance & Charter', href: '/app/compliance', icon: ShieldCheck },
+  { name: 'Settings', href: '/app/settings', icon: Settings },
 ];
 
 export function Sidebar() {

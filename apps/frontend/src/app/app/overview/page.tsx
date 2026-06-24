@@ -1,15 +1,16 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { GlassPanel, cn } from '@/components/ui/GlassPanel';
 import { Badge } from '@/components/ui/Badge';
 import { AnomalyDrawer } from '@/components/analytics/AnomalyDrawer';
-import { AlertTriangle, TrendingUp, Users, Activity } from 'lucide-react';
+import { AlertTriangle, TrendingUp, Users, Activity, Loader2 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, Legend,
 } from 'recharts';
 import type { AnomalyFlag } from '@/lib/types';
+import { api } from '@/lib/api';
 
 const attritionData = [
   { month: 'Jan', rate: 2.1, predicted: 2.1 },
@@ -27,50 +28,7 @@ const riskByDept = [
   { name: 'Product',     high: 3,  medium: 10, low: 25 },
 ];
 
-const mockAnomalies: AnomalyFlag[] = [
-  {
-    id: 'anm-001',
-    company_id: 'c1',
-    anomaly_type: 'team_attrition',
-    severity: 'critical',
-    entity_type: 'manager',
-    entity_id: 'mgr-042',
-    entity_name: 'Manager JD (Sales)',
-    description: { team_size: 8, exits_6mo: 3, attrition_rate_pct: 37.5 },
-    metric_value: 37.5,
-    threshold_value: 20.0,
-    detected_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    is_active: true,
-  },
-  {
-    id: 'anm-002',
-    company_id: 'c1',
-    anomaly_type: 'response_rate_drop',
-    severity: 'warning',
-    entity_type: 'department',
-    entity_id: 'Engineering',
-    entity_name: 'Engineering',
-    description: { department: 'Engineering', previous_month_responses: 85, current_month_responses: 55, drop_pct: 35.3 },
-    metric_value: 55,
-    threshold_value: 85,
-    detected_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-    is_active: true,
-  },
-  {
-    id: 'anm-003',
-    company_id: 'c1',
-    anomaly_type: 'leave_spike',
-    severity: 'alert',
-    entity_type: 'department',
-    entity_id: 'Product',
-    entity_name: 'Product',
-    description: { department: 'Product', current_month_leave_days: 48, baseline_mean: 18.2, baseline_std: 4.6, sigma_deviation: 2.56 },
-    metric_value: 48,
-    threshold_value: 18.2,
-    detected_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    is_active: true,
-  },
-];
+// Mock data for charts (API endpoints not yet built for these specific aggregations)
 
 const SEVERITY_STYLES = {
   critical: 'bg-red-500 pulse-glow',
@@ -87,12 +45,30 @@ function timeAgo(iso: string): string {
 
 export default function OverviewPage() {
   const [selectedAnomaly, setSelectedAnomaly] = useState<AnomalyFlag | null>(null);
-  const [anomalies, setAnomalies] = useState<AnomalyFlag[]>(mockAnomalies);
+  const [anomalies, setAnomalies] = useState<AnomalyFlag[]>([]);
+  const [loadingAnomalies, setLoadingAnomalies] = useState(true);
 
-  const handleResolve = (id: string) => {
+  useEffect(() => {
+    async function fetchAnomalies() {
+      setLoadingAnomalies(true);
+      const { data, error } = await api.get<{ results: AnomalyFlag[] }>('/analytics/anomalies/');
+      if (data && data.results) {
+        setAnomalies(data.results);
+      } else {
+        console.error('Failed to fetch anomalies:', error);
+      }
+      setLoadingAnomalies(false);
+    }
+    fetchAnomalies();
+  }, []);
+
+  const handleResolve = async (id: string) => {
+    // Optimistic UI update
     setAnomalies(prev =>
       prev.map(a => a.id === id ? { ...a, is_active: false, resolved_at: new Date().toISOString() } : a)
     );
+    // Real API call
+    await api.post(`/analytics/anomalies/${id}/resolve/`, {});
   };
 
   const activeAnomalies = anomalies.filter(a => a.is_active);
@@ -199,33 +175,44 @@ export default function OverviewPage() {
             </Badge>
           </div>
           <div className="flex-1 space-y-3">
-            {anomalies.map((anomaly) => (
-              <button
-                key={anomaly.id}
-                onClick={() => setSelectedAnomaly(anomaly)}
-                className={cn(
-                  'w-full text-left p-4 rounded-lg border transition-all cursor-pointer relative overflow-hidden group',
-                  anomaly.is_active
-                    ? 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
-                    : 'bg-white/2 border-white/5 opacity-50'
-                )}
-              >
-                <div className={cn(
-                  'absolute left-0 top-0 bottom-0 w-1',
-                  SEVERITY_STYLES[anomaly.severity]
-                )} />
-                <div className="flex justify-between items-start mb-1 ml-2">
-                  <span className="text-sm font-medium text-white group-hover:text-blue-400 transition-colors">
-                    {anomaly.entity_name}
-                  </span>
-                  <span className="text-xs text-gray-500">{timeAgo(anomaly.detected_at)}</span>
-                </div>
-                <p className="text-xs text-gray-400 ml-2 capitalize">
-                  {anomaly.anomaly_type.replace(/_/g, ' ')}
-                  {!anomaly.is_active && <span className="ml-2 text-emerald-500">✓ resolved</span>}
-                </p>
-              </button>
-            ))}
+            {loadingAnomalies ? (
+              <div className="flex items-center justify-center p-8 text-gray-500">
+                <Loader2 className="w-6 h-6 animate-spin mr-2" />
+                Loading anomalies...
+              </div>
+            ) : anomalies.length === 0 ? (
+              <div className="flex items-center justify-center p-8 text-gray-500">
+                No anomalies detected.
+              </div>
+            ) : (
+              anomalies.map((anomaly) => (
+                <button
+                  key={anomaly.id}
+                  onClick={() => setSelectedAnomaly(anomaly)}
+                  className={cn(
+                    'w-full text-left p-4 rounded-lg border transition-all cursor-pointer relative overflow-hidden group',
+                    anomaly.is_active
+                      ? 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
+                      : 'bg-white/2 border-white/5 opacity-50'
+                  )}
+                >
+                  <div className={cn(
+                    'absolute left-0 top-0 bottom-0 w-1',
+                    SEVERITY_STYLES[anomaly.severity]
+                  )} />
+                  <div className="flex justify-between items-start mb-1 ml-2">
+                    <span className="text-sm font-medium text-white group-hover:text-blue-400 transition-colors">
+                      {anomaly.entity_name}
+                    </span>
+                    <span className="text-xs text-gray-500">{timeAgo(anomaly.detected_at)}</span>
+                  </div>
+                  <p className="text-xs text-gray-400 ml-2 capitalize">
+                    {anomaly.anomaly_type.replace(/_/g, ' ')}
+                    {!anomaly.is_active && <span className="ml-2 text-emerald-500">✓ resolved</span>}
+                  </p>
+                </button>
+              ))
+            )}
           </div>
         </GlassPanel>
       </div>

@@ -40,6 +40,7 @@ class PulseSurvey(models.Model):
     )
     starts_at = models.DateTimeField()
     ends_at = models.DateTimeField()
+    target_audience = models.CharField(max_length=255, default='All Employees')
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

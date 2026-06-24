@@ -83,16 +83,18 @@ export type ComponentScores = Record<SignalName, number>;
 
 export interface RiskScore {
   id: string;
-  employee_id: string;
-  company_id: string;
-  employee?: Employee;
+  employee: string;
+  employee_code: string;
+  employee_name: string;
+  department?: string; // Only in detail view
+  role_title?: string; // Only in detail view
   calculated_at: string;
-  overall_score: number;
+  overall_score: number | string; // Django DecimalField might be serialized as string
   risk_tier: 'low' | 'medium' | 'high' | 'critical';
-  component_scores: ComponentScores;
-  top_factors: SignalName[];
+  component_scores?: ComponentScores; // Only in detail view
+  top_factors?: SignalName[]; // Only in detail view
   model_version: string;
-  model_confidence?: number;
+  model_confidence?: number | null;
   scoring_method: 'rule_based' | 'xgboost';
 }
 
@@ -128,16 +130,17 @@ export interface AnomalyFlag {
 
 export interface PulseSurvey {
   id: string;
-  company_id: string;
+  company: string; // Serializer returns company ID here
   title: string;
   description?: string;
+  target_audience: string;
   status: 'draft' | 'active' | 'closed';
   questions?: SurveyQuestion[];
   starts_at: string;
   ends_at: string;
   created_at: string;
   response_count?: number;
-  total_recipients?: number;
+  unique_respondents?: number;
 }
 
 export interface SurveyQuestion {
@@ -229,25 +232,33 @@ export interface RiskDistribution {
   percentage: number;
 }
 
-export interface SurveyQuestionResult {
-  question: SurveyQuestion;
-  avg_score?: number;
-  distribution: { label: string; count: number }[];
-  responses_count: number;
-  open_responses?: string[];
+export interface QuestionResult {
+  question_id: string;
+  question_text: string;
+  question_type: string;
+  total_responses: number;
+  average_score?: number | null;
+  score_distribution?: Record<string, number>;
+  yes_percentage?: number | null;
+}
+
+export interface SurveyResults {
+  survey_id: string;
+  survey_title: string;
+  total_respondents: number;
+  total_responses: number;
+  response_rate: number;
+  questions: QuestionResult[];
 }
 
 // ---- API wrapper types ----
 
+// Pagination wrapper for Django REST Framework
 export interface ApiResponse<T> {
-  data: T;
-  message?: string;
-  pagination?: {
-    page: number;
-    page_size: number;
-    total: number;
-    total_pages: number;
-  };
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T;
 }
 
 export interface ApiError {

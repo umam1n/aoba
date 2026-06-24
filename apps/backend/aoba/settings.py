@@ -10,13 +10,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # === Security ===
 SECRET_KEY = config('DJANGO_SECRET_KEY', default='insecure-dev-key-change-in-production')
 DEBUG = config('DJANGO_DEBUG', default=True, cast=bool)
-ALLOWED_HOSTS = config('DJANGO_ALLOWED_HOSTS', default='127.0.0.1,127.0.0.1', cast=Csv())
+ALLOWED_HOSTS = config('DJANGO_ALLOWED_HOSTS', default='127.0.0.1,localhost', cast=Csv())
 
 # === Encryption ===
 FIELD_ENCRYPTION_KEY = config('FIELD_ENCRYPTION_KEY', default='')
 
 # === Application Definition ===
 INSTALLED_APPS = [
+    'jazzmin',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -49,6 +50,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     # AOBA custom middleware
+    'core.middleware.LocalAuthMiddleware',
     'core.middleware.CompanyMiddleware',
     'core.middleware.DelinquencyGuardMiddleware',
 ]
@@ -73,16 +75,15 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'aoba.wsgi.application'
 
+import dj_database_url
+
 # === Database ===
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-        'USER': config('DATABASE_USER', default='postgres'),
-        'PASSWORD': config('DATABASE_PASSWORD', default='postgres'),
-        'HOST': config('DATABASE_HOST', default='127.0.0.1'),
-        'PORT': config('DATABASE_PORT', default='5432'),
-    }
+    'default': dj_database_url.config(
+        default=config('DATABASE_URL', default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}"),
+        conn_max_age=600,
+        conn_health_checks=True,
+    )
 }
 
 # === Auth ===
@@ -110,6 +111,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'core.authentication.SupabaseJWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',  # To respect LocalAuthMiddleware
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
@@ -147,6 +149,7 @@ CORS_ALLOW_HEADERS = [
     'content-type',
     'origin',
     'x-company-id',
+    'x-mock-email',
     'x-csrftoken',
 ]
 

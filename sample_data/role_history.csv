@@ -1,0 +1,7 @@
+employee_code,role_title,role_level,effective_date,change_type
+EMP001,Software Engineer,Mid,2022-01-15,hire
+EMP001,Lead Engineer,Senior,2024-01-15,promotion
+EMP002,Software Engineer,Mid,2023-03-10,hire
+EMP003,Account Executive,Senior,2021-06-01,hire
+EMP004,Sales Rep,Junior,2024-01-20,hire
+EMP005,Content Strategist,Mid,2022-11-05,hire

@@ -1,0 +1,6 @@
+employee_code,full_name,email,department,division,role_title,role_level,hire_date,exit_date,exit_type,current_salary,employment_status,manager_code
+EMP001,Alice Smith,alice@example.com,Engineering,Backend,Lead Engineer,Senior,2022-01-15,,,,120000,active,
+EMP002,Bob Johnson,bob@example.com,Engineering,Backend,Software Engineer,Mid,2023-03-10,,,,95000,active,EMP001
+EMP003,Carol White,carol@example.com,Sales,Enterprise,Account Executive,Senior,2021-06-01,,,,110000,active,
+EMP004,David Brown,david@example.com,Sales,SMB,Sales Rep,Junior,2024-01-20,,,,60000,active,EMP003
+EMP005,Eve Davis,eve@example.com,Marketing,Content,Content Strategist,Mid,2022-11-05,2024-05-01,voluntary,75000,exited,

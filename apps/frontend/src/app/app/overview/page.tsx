@@ -9,7 +9,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, Legend,
 } from 'recharts';
-import type { AnomalyFlag } from '@/lib/types';
+import type { AnomalyFlag, RiskScore } from '@/lib/types';
 import { api } from '@/lib/api';
 
 const attritionData = [
@@ -20,15 +20,6 @@ const attritionData = [
   { month: 'May', rate: 3.5, predicted: 3.8 },
   { month: 'Jun', rate: null, predicted: 4.2 },
 ];
-
-const riskByDept = [
-  { name: 'Engineering', high: 12, medium: 28, low: 80 },
-  { name: 'Sales',       high: 18, medium: 22, low: 45 },
-  { name: 'Marketing',   high: 5,  medium: 15, low: 30 },
-  { name: 'Product',     high: 3,  medium: 10, low: 25 },
-];
-
-// Mock data for charts (API endpoints not yet built for these specific aggregations)
 
 const SEVERITY_STYLES = {
   critical: 'bg-red-500 pulse-glow',
@@ -47,31 +38,65 @@ export default function OverviewPage() {
   const [selectedAnomaly, setSelectedAnomaly] = useState<AnomalyFlag | null>(null);
   const [anomalies, setAnomalies] = useState<AnomalyFlag[]>([]);
   const [loadingAnomalies, setLoadingAnomalies] = useState(true);
+  
+  const [headcount, setHeadcount] = useState<number>(0);
+  const [riskScores, setRiskScores] = useState<RiskScore[]>([]);
+  const [loadingData, setLoadingData] = useState(true);
 
   useEffect(() => {
-    async function fetchAnomalies() {
+    async function fetchData() {
       setLoadingAnomalies(true);
-      const { data, error } = await api.get<{ results: AnomalyFlag[] }>('/analytics/anomalies/');
-      if (data && data.results) {
-        setAnomalies(data.results);
-      } else {
-        console.error('Failed to fetch anomalies:', error);
+      setLoadingData(true);
+      
+      const [anomaliesRes, empRes, riskRes] = await Promise.all([
+        api.get<{ results: AnomalyFlag[] }>('/analytics/anomalies/'),
+        api.get<{ count: number }>('/employees/'),
+        api.get<{ results: RiskScore[] }>('/analytics/risk-scores/?page_size=500')
+      ]);
+      
+      if (anomaliesRes.data && anomaliesRes.data.results) {
+        setAnomalies(anomaliesRes.data.results);
       }
+      if (empRes.data) {
+        setHeadcount(empRes.data.count || 0);
+      }
+      if (riskRes.data && riskRes.data.results) {
+        setRiskScores(riskRes.data.results);
+      }
+      
       setLoadingAnomalies(false);
+      setLoadingData(false);
     }
-    fetchAnomalies();
+    fetchData();
   }, []);
 
   const handleResolve = async (id: string) => {
-    // Optimistic UI update
     setAnomalies(prev =>
       prev.map(a => a.id === id ? { ...a, is_active: false, resolved_at: new Date().toISOString() } : a)
     );
-    // Real API call
     await api.post(`/analytics/anomalies/${id}/resolve/`, {});
   };
 
   const activeAnomalies = anomalies.filter(a => a.is_active);
+  const highRiskCount = riskScores.filter(r => r.risk_tier === 'critical' || r.risk_tier === 'high').length;
+  const avgConfidence = riskScores.length > 0 
+    ? (riskScores.reduce((acc, r) => acc + (r.model_confidence ? Number(r.model_confidence) : 0.85), 0) / riskScores.length * 100).toFixed(0)
+    : 85;
+
+  // Compute Risk by Dept
+  const deptRiskMap: Record<string, { high: number; medium: number; low: number }> = {};
+  riskScores.forEach(r => {
+    const dept = r.department || 'Unknown';
+    if (!deptRiskMap[dept]) deptRiskMap[dept] = { high: 0, medium: 0, low: 0 };
+    if (r.risk_tier === 'critical' || r.risk_tier === 'high') deptRiskMap[dept].high++;
+    else if (r.risk_tier === 'medium') deptRiskMap[dept].medium++;
+    else deptRiskMap[dept].low++;
+  });
+  
+  const riskByDept = Object.keys(deptRiskMap).map(name => ({
+    name,
+    ...deptRiskMap[name]
+  })).sort((a, b) => b.high - a.high);
 
   return (
     <div className="space-y-6">
@@ -98,12 +123,9 @@ export default function OverviewPage() {
             <Users className="text-blue-400 w-5 h-5" />
           </div>
           <div className="mt-4 flex items-baseline gap-2">
-            <span className="text-4xl font-bold text-white">412</span>
-            <span className="text-emerald-400 text-sm font-medium flex items-center">
-              <TrendingUp className="w-4 h-4 mr-1" /> +12%
-            </span>
+            <span className="text-4xl font-bold text-white">{loadingData ? '...' : headcount}</span>
           </div>
-          <p className="text-xs text-gray-500 mt-2">vs last quarter</p>
+          <p className="text-xs text-gray-500 mt-2">Active employees in database</p>
         </GlassPanel>
 
         <GlassPanel strong className="p-6">
@@ -112,12 +134,9 @@ export default function OverviewPage() {
             <AlertTriangle className="text-red-400 w-5 h-5" />
           </div>
           <div className="mt-4 flex items-baseline gap-2">
-            <span className="text-4xl font-bold text-white">38</span>
-            <span className="text-red-400 text-sm font-medium flex items-center">
-              <TrendingUp className="w-4 h-4 mr-1" /> +4
-            </span>
+            <span className="text-4xl font-bold text-white">{loadingData ? '...' : highRiskCount}</span>
           </div>
-          <p className="text-xs text-gray-500 mt-2">vs last month</p>
+          <p className="text-xs text-gray-500 mt-2">Requires immediate attention</p>
         </GlassPanel>
 
         <GlassPanel strong className="p-6">
@@ -126,12 +145,9 @@ export default function OverviewPage() {
             <Activity className="text-emerald-400 w-5 h-5" />
           </div>
           <div className="mt-4 flex items-baseline gap-2">
-            <span className="text-4xl font-bold text-white">87%</span>
-            <span className="text-emerald-400 text-sm font-medium flex items-center">
-              <TrendingUp className="w-4 h-4 mr-1" /> +2%
-            </span>
+            <span className="text-4xl font-bold text-white">{loadingData ? '...' : avgConfidence}%</span>
           </div>
-          <p className="text-xs text-gray-500 mt-2">Layer 4 XGBoost Model Active</p>
+          <p className="text-xs text-gray-500 mt-2">AOBA Analytics Engine</p>
         </GlassPanel>
       </div>
 

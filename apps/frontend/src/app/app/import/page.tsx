@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { UploadCloud, FileType, CheckCircle, AlertCircle, RefreshCw, Trash2 } from 'lucide-react';
+import { UploadCloud, FileType, CheckCircle, AlertCircle, RefreshCw, Trash2, Clock } from 'lucide-react';
 import { cn } from '@/components/ui/GlassPanel';
+import { api } from '@/lib/api';
 
 interface UploadTask {
   id: string;
@@ -16,19 +17,43 @@ interface UploadTask {
   rowsProcessed?: number;
   rowsError?: number;
   message?: string;
+  ingestionLogId?: string;
 }
 
-const mockHistory: UploadTask[] = [
-  { id: '1', filename: 'employees_q2.csv', type: 'Employees', progress: 100, status: 'completed', rowsProcessed: 412, rowsError: 0, message: 'Import successful' },
-  { id: '2', filename: 'comp_history_2026.csv', type: 'Compensation', progress: 100, status: 'completed', rowsProcessed: 1250, rowsError: 2, message: 'Completed with warnings' },
-  { id: '3', filename: 'leave_records_may.csv', type: 'Leave Records', progress: 45, status: 'error', rowsProcessed: 0, rowsError: 85, message: 'Invalid column headers' }
-];
+interface IngestionLog {
+  id: string;
+  file_name: string;
+  file_type: string;
+  status: string;
+  rows_total: number;
+  rows_imported: number;
+  rows_skipped: number;
+  errors: any[];
+  uploaded_at: string;
+}
 
 export default function ImportPage() {
-  const [tasks, setTasks] = useState<UploadTask[]>(mockHistory);
+  const [tasks, setTasks] = useState<UploadTask[]>([]);
+  const [logs, setLogs] = useState<IngestionLog[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [importType, setImportType] = useState('employees');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const fetchLogs = async () => {
+    const { data } = await api.get<{ results: IngestionLog[] }>('/analytics/ingestion-logs/');
+    if (data && data.results) {
+      setLogs(data.results.slice(0, 10)); // Top 10 most recent
+    }
+  };
+
+  useEffect(() => {
+    fetchLogs();
+    // Poll for logs every 5 seconds if there are processing tasks
+    const interval = setInterval(() => {
+      fetchLogs();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -40,9 +65,10 @@ export default function ImportPage() {
     setIsDragging(false);
   };
 
-  const processFile = (file: File) => {
+  const processFile = async (file: File) => {
+    const taskId = `task-${Date.now()}`;
     const newTask: UploadTask = {
-      id: `task-${Date.now()}`,
+      id: taskId,
       filename: file.name,
       type: importType.charAt(0).toUpperCase() + importType.slice(1).replace('_', ' '),
       progress: 0,
@@ -51,30 +77,31 @@ export default function ImportPage() {
 
     setTasks(prev => [newTask, ...prev]);
 
-    // Simulate progress
-    let currentProgress = 0;
-    const interval = setInterval(() => {
-      currentProgress += Math.random() * 20;
-      if (currentProgress >= 100) {
-        currentProgress = 100;
-        clearInterval(interval);
-        
-        // Transition to processing, then to completed
-        setTasks(prev => prev.map(t => t.id === newTask.id ? { ...t, progress: 100, status: 'processing' } : t));
-        
-        setTimeout(() => {
-          setTasks(prev => prev.map(t => t.id === newTask.id ? { 
-            ...t, 
-            status: 'completed', 
-            rowsProcessed: Math.floor(Math.random() * 500) + 50,
-            rowsError: 0,
-            message: 'Import successful'
-          } : t));
-        }, 1500);
-      } else {
-        setTasks(prev => prev.map(t => t.id === newTask.id ? { ...t, progress: currentProgress } : t));
+    try {
+      const { data, error } = await api.upload<any>('/employees/import/', file, { file_type: importType });
+
+      if (error) {
+        throw new Error(error.message || 'Import failed');
       }
-    }, 400);
+
+      setTasks(prev => prev.map(t => t.id === taskId ? { 
+        ...t, 
+        progress: 100, 
+        status: data.status === 'pending' ? 'processing' : 'completed', 
+        rowsProcessed: data.imported || 0,
+        rowsError: data.error_count || 0,
+        message: data.message + (data.errors && data.errors.length > 0 ? ` (${data.errors[0].errors.join(', ')})` : ''),
+        ingestionLogId: data.ingestion_log_id
+      } : t));
+
+      fetchLogs();
+    } catch (e: any) {
+      setTasks(prev => prev.map(t => t.id === taskId ? { 
+        ...t, 
+        status: 'error', 
+        message: e.message 
+      } : t));
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -154,7 +181,7 @@ export default function ImportPage() {
           </GlassPanel>
 
           <GlassPanel className="p-6">
-            <h3 className="text-lg font-semibold text-white mb-4">Active & Recent Imports</h3>
+            <h3 className="text-lg font-semibold text-white mb-4">Active Session Uploads</h3>
             
             <div className="space-y-4">
               {tasks.map(task => (
@@ -177,7 +204,7 @@ export default function ImportPage() {
                   <div className="flex justify-between text-xs text-gray-400 mb-1 ml-8">
                     <span>{task.type}</span>
                     {task.status === 'completed' || task.status === 'error' ? (
-                      <span>{task.rowsProcessed} rows processed {task.rowsError ? `(${task.rowsError} errors)` : ''}</span>
+                      <span>{task.rowsProcessed} rows imported {task.rowsError ? `(${task.rowsError} skipped)` : ''}</span>
                     ) : (
                       <span>{Math.round(task.progress)}%</span>
                     )}
@@ -199,7 +226,7 @@ export default function ImportPage() {
               
               {tasks.length === 0 && (
                 <div className="text-center py-8 text-gray-500 text-sm border border-dashed border-white/10 rounded-md">
-                  No recent imports
+                  No active session uploads
                 </div>
               )}
             </div>
@@ -208,31 +235,38 @@ export default function ImportPage() {
 
         <div className="space-y-6">
           <GlassPanel className="p-6">
-            <h3 className="text-lg font-semibold text-white mb-4">Ingestion Logs</h3>
+            <h3 className="text-lg font-semibold text-white mb-4 flex justify-between items-center">
+              <span>Ingestion Logs</span>
+              <Button variant="ghost" size="sm" onClick={fetchLogs}><RefreshCw className="w-4 h-4" /></Button>
+            </h3>
             <div className="relative border-l border-white/10 ml-3 space-y-5 pb-2">
-              <div className="relative pl-6">
-                <div className="absolute left-[-5px] top-1.5 w-2 h-2 rounded-full bg-emerald-400 ring-4 ring-[#0f172a]" />
-                <p className="text-sm text-white">System sync completed</p>
-                <p className="text-[10px] text-gray-500 mt-1">2 hours ago</p>
-              </div>
-              <div className="relative pl-6">
-                <div className="absolute left-[-5px] top-1.5 w-2 h-2 rounded-full bg-emerald-400 ring-4 ring-[#0f172a]" />
-                <p className="text-sm text-white">employees_q2.csv imported</p>
-                <p className="text-xs text-gray-400 mt-0.5">Admin User imported 412 rows</p>
-                <p className="text-[10px] text-gray-500 mt-1">Yesterday at 14:30</p>
-              </div>
-              <div className="relative pl-6">
-                <div className="absolute left-[-5px] top-1.5 w-2 h-2 rounded-full bg-blue-400 ring-4 ring-[#0f172a]" />
-                <p className="text-sm text-white">XGBoost recalculation triggered</p>
-                <p className="text-xs text-gray-400 mt-0.5">32 risk scores updated</p>
-                <p className="text-[10px] text-gray-500 mt-1">Yesterday at 14:35</p>
-              </div>
-              <div className="relative pl-6">
-                <div className="absolute left-[-5px] top-1.5 w-2 h-2 rounded-full bg-red-400 ring-4 ring-[#0f172a]" />
-                <p className="text-sm text-white">Import failed</p>
-                <p className="text-xs text-gray-400 mt-0.5">leave_records_may.csv rejected</p>
-                <p className="text-[10px] text-gray-500 mt-1">May 28 at 09:15</p>
-              </div>
+              {logs.length === 0 && (
+                <p className="text-sm text-gray-500 pl-4">No import logs found.</p>
+              )}
+              {logs.map(log => (
+                <div key={log.id} className="relative pl-6">
+                  <div className={cn(
+                    "absolute left-[-5px] top-1.5 w-2 h-2 rounded-full ring-4 ring-[#0f172a]",
+                    log.status === 'completed' ? (log.errors?.length ? 'bg-amber-400' : 'bg-emerald-400') : 
+                    log.status === 'failed' ? 'bg-red-400' : 'bg-blue-400'
+                  )} />
+                  <p className="text-sm text-white font-medium">{log.file_name}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {log.status === 'completed' ? `Imported ${log.rows_imported} rows. Skipped ${log.rows_skipped}.` : log.status}
+                  </p>
+                  {log.errors && log.errors.length > 0 && (
+                    <div className="text-[10px] mt-1 p-2 bg-red-500/10 rounded text-red-300 max-h-24 overflow-y-auto">
+                      {log.errors.slice(0, 3).map((e, i) => (
+                        <div key={i}>Row {e.row}: {e.errors.join(', ')}</div>
+                      ))}
+                      {log.errors.length > 3 && <div>...and {log.errors.length - 3} more.</div>}
+                    </div>
+                  )}
+                  <p className="text-[10px] text-gray-500 mt-1 flex items-center gap-1">
+                    <Clock className="w-3 h-3" /> {new Date(log.uploaded_at).toLocaleString()}
+                  </p>
+                </div>
+              ))}
             </div>
           </GlassPanel>
         </div>

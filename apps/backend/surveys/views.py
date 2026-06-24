@@ -154,6 +154,76 @@ class PulseSurveyViewSet(AuditLogMixin, viewsets.ModelViewSet):
             status=status.HTTP_201_CREATED,
         )
 
+    @action(detail=True, methods=['get'], permission_classes=[])
+    def public(self, request, pk=None):
+        """
+        Public endpoint to fetch an active survey.
+        """
+        try:
+            survey = PulseSurvey.objects.get(pk=pk)
+        except PulseSurvey.DoesNotExist:
+            return Response({'error': 'Survey not found.'}, status=status.HTTP_404_NOT_FOUND)
+            
+        if survey.status != 'active':
+            return Response({'error': 'Survey is not active.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        return Response(PulseSurveySerializer(survey).data)
+
+    @action(detail=True, methods=['post'], permission_classes=[])
+    def submit(self, request, pk=None):
+        """
+        Submit a complete survey response.
+        Expects:
+        {
+          "employee_code": "EMP001",
+          "responses": [
+            {"question_id": "uuid", "response_value": 4, "response_text": ""}
+          ]
+        }
+        """
+        try:
+            survey = PulseSurvey.objects.get(pk=pk)
+        except PulseSurvey.DoesNotExist:
+            return Response({'error': 'Survey not found.'}, status=status.HTTP_404_NOT_FOUND)
+        
+        if survey.status != 'active':
+            return Response({'error': 'Survey is not active.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        employee_code = request.data.get('employee_code')
+        responses_data = request.data.get('responses', [])
+        
+        if not employee_code:
+            return Response({'error': 'employee_code is required.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            employee = Employee.objects.get(company=survey.company, employee_code=employee_code)
+        except Employee.DoesNotExist:
+            return Response({'error': 'Invalid employee code.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        created_responses = []
+        for r_data in responses_data:
+            q_id = r_data.get('question_id')
+            
+            try:
+                question = SurveyQuestion.objects.get(id=q_id, survey=survey)
+            except SurveyQuestion.DoesNotExist:
+                continue
+                
+            # Upsert response (allow updating if they submit again? Or fail if exists?)
+            response_obj, created = SurveyResponse.objects.update_or_create(
+                question=question,
+                employee=employee,
+                company=survey.company,
+                defaults={
+                    'response_value': r_data.get('response_value'),
+                    'response_text': r_data.get('response_text', '')
+                }
+            )
+            created_responses.append(response_obj)
+
+        return Response({'status': 'success', 'responses_recorded': len(created_responses)})
+
+
 
 class SurveyResponseViewSet(AuditLogMixin, viewsets.ModelViewSet):
     """

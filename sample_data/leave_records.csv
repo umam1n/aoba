@@ -1,0 +1,6 @@
+employee_code,leave_type,start_date,end_date,days_count
+EMP001,annual,2023-12-20,2023-12-31,8
+EMP001,sick,2024-02-15,2024-02-16,2
+EMP002,personal,2023-10-10,2023-10-10,1
+EMP003,annual,2024-05-01,2024-05-05,3
+EMP005,sick,2023-08-10,2023-08-14,3

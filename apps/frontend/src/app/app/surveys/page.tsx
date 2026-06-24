@@ -307,15 +307,42 @@ export default function SurveysPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-1">Target Audience</label>
-                  <select 
-                    value={audience}
-                    onChange={e => setAudience(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-md py-2 px-3 text-white focus:outline-none focus:border-blue-500 transition-colors"
-                  >
-                    <option value="All Employees">All Employees</option>
-                    <option value="Engineering Only">Engineering Only</option>
-                    <option value="Sales Only">Sales Only</option>
-                  </select>
+                  <div className="w-full bg-white/5 border border-white/10 rounded-md py-2 px-3 text-white focus-within:border-blue-500 transition-colors h-24 overflow-y-auto">
+                    <label className="flex items-center gap-2 mb-1 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={audience === 'All Employees'}
+                        onChange={(e) => {
+                          if (e.target.checked) setAudience('All Employees');
+                        }}
+                        className="rounded border-white/20 bg-transparent text-blue-500 focus:ring-blue-500"
+                      />
+                      <span className="text-sm">All Employees</span>
+                    </label>
+                    {['Engineering', 'Sales', 'Marketing', 'Product', 'HR', 'Finance'].map(dept => (
+                      <label key={dept} className="flex items-center gap-2 mb-1 cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          checked={audience !== 'All Employees' && audience.includes(dept)}
+                          onChange={(e) => {
+                            if (audience === 'All Employees') {
+                              setAudience(dept);
+                            } else {
+                              const current = audience.split(', ').filter(Boolean);
+                              if (e.target.checked) {
+                                setAudience([...current, dept].join(', '));
+                              } else {
+                                const next = current.filter(d => d !== dept).join(', ');
+                                setAudience(next || 'All Employees');
+                              }
+                            }
+                          }}
+                          className="rounded border-white/20 bg-transparent text-blue-500 focus:ring-blue-500"
+                        />
+                        <span className="text-sm">{dept} Department</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-1">Close Date</label>

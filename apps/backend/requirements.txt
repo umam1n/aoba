@@ -18,3 +18,4 @@ requests>=2.31
 xgboost>=2.0
 shap>=0.44
 dj-database-url>=2.1.0
+django-jazzmin>=3.0.0

@@ -5,7 +5,7 @@ import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Badge } from '@/components/ui/Badge';
 import { SignalRadarChart } from '@/components/analytics/SignalRadarChart';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
-import { AlertTriangle, Filter, X, ArrowUpDown, Loader2 } from 'lucide-react';
+import { AlertTriangle, Filter, X, ArrowUpDown, Loader2, RefreshCw } from 'lucide-react';
 import type { RiskScore, SignalName, ApiResponse } from '@/lib/types';
 import { api } from '@/lib/api';
 
@@ -30,6 +30,7 @@ export default function RiskPage() {
   
   const [selectedEmployee, setSelectedEmployee] = useState<RiskScore | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [recalculating, setRecalculating] = useState(false);
 
   useEffect(() => {
     async function fetchRiskScores() {
@@ -44,8 +45,27 @@ export default function RiskPage() {
         setLoadingList(false);
       }
     }
+    }
     fetchRiskScores();
   }, []);
+
+  const handleRecalculate = async () => {
+    setRecalculating(true);
+    try {
+      await api.post('/analytics/recalculate/');
+      // Re-fetch after a short delay to allow calculation
+      setTimeout(async () => {
+        try {
+          const res = await api.get<ApiResponse<RiskScore[]>>('/analytics/risk-scores/');
+          setRiskScores(res.data?.results || []);
+        } catch (e) { }
+        setRecalculating(false);
+      }, 2000);
+    } catch (error) {
+      console.error('Failed to recalculate:', error);
+      setRecalculating(false);
+    }
+  };
 
   const handleSelectEmployee = async (employee: RiskScore) => {
     // If we already have the detailed component scores, just select it
@@ -88,6 +108,15 @@ export default function RiskPage() {
           <h1 className="text-2xl font-bold text-white tracking-tight">Risk Intelligence</h1>
           <p className="text-gray-400 mt-1">AI-driven attrition and performance risk analysis.</p>
         </div>
+        <Button 
+          variant="outline" 
+          className="flex items-center gap-2"
+          onClick={handleRecalculate}
+          disabled={recalculating}
+        >
+          <RefreshCw className={`w-4 h-4 ${recalculating ? 'animate-spin' : ''}`} />
+          {recalculating ? 'Recalculating...' : 'Recalculate Scores'}
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

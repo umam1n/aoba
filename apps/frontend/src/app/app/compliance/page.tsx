@@ -11,6 +11,7 @@ export default function CompliancePage() {
   const [consentLogs, setConsentLogs] = useState<any[]>([]);
   const [auditTrail, setAuditTrail] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -26,6 +27,26 @@ export default function CompliancePage() {
     }
     fetchData();
   }, []);
+
+  const handleExport = async () => {
+    // In a real DSAR flow, an employee ID would be provided. For HR Admin, we'll request a generic export or prompt for ID.
+    const empId = prompt("Enter Employee ID to generate Data Subject Access Request export:");
+    if (!empId) return;
+
+    setExporting(true);
+    try {
+      const res = await api.post<any>('/compliance/export/', { employee_id: empId });
+      if (res.data?.download_url) {
+        window.open(res.data.download_url, '_blank');
+      } else {
+        alert("Export generated successfully (JSON data logged to console for demo).");
+        console.log("DSAR Export:", res.data);
+      }
+    } catch (err: any) {
+      alert("Failed to export: " + err.message);
+    }
+    setExporting(false);
+  };
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -33,8 +54,14 @@ export default function CompliancePage() {
           <h1 className="text-2xl font-bold text-white tracking-tight">Data Privacy & Compliance</h1>
           <p className="text-gray-400 mt-1">Manage UU PDP compliance, consent, and audit trails.</p>
         </div>
-        <Button variant="outline" className="flex items-center gap-2">
-          <DownloadCloud className="w-4 h-4" /> Data Subject Access Request
+        <Button 
+          variant="outline" 
+          className="flex items-center gap-2"
+          onClick={handleExport}
+          disabled={exporting}
+        >
+          {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <DownloadCloud className="w-4 h-4" />} 
+          Data Subject Access Request
         </Button>
       </div>
 

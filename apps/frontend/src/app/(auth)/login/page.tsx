@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/Button';
 import { Activity, Lock, Mail, Eye, EyeOff } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+import { api } from '@/lib/api';
 
 // Demo credentials shown on screen for mock mode
 const DEMO_EMAIL    = 'admin@aoba.demo';
@@ -20,11 +22,10 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const from         = searchParams.get('from') || '/app/overview';
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    // Accept any non-empty credentials in mock mode
     if (!email.trim() || !password.trim()) {
       setError('Please enter your email and password.');
       return;
@@ -32,16 +33,43 @@ function LoginForm() {
 
     setIsLoading(true);
 
-    // Set mock auth cookie (expires in 8 hours)
-    const expires = new Date(Date.now() + 8 * 60 * 60 * 1000).toUTCString();
-    document.cookie = `aoba_mock_auth=true; path=/; expires=${expires}; SameSite=Lax`;
+    try {
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
 
-    // Store company id for API client
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('aoba_company_id', 'c1-mock');
+      if (authError) {
+        // Fallback to mock for testing if it's the demo email and real auth fails
+        if (email === DEMO_EMAIL) {
+          console.warn('Real auth failed, using mock mode for demo email');
+          const expires = new Date(Date.now() + 8 * 60 * 60 * 1000).toUTCString();
+          document.cookie = `aoba_mock_auth=true; path=/; expires=${expires}; SameSite=Lax`;
+          localStorage.setItem('aoba_company_id', 'c1-mock');
+          router.push(from);
+          return;
+        }
+        throw new Error(authError.message);
+      }
+
+      // Successful auth, now fetch the company
+      // The API client will automatically attach the JWT token
+      const companyRes = await api.get<any>('/companies/');
+      
+      if (companyRes.data?.results && companyRes.data.results.length > 0) {
+        const comp = companyRes.data.results[0];
+        localStorage.setItem('aoba_company_id', comp.id);
+      } else {
+        console.warn('User has no company associated, or fetch failed', companyRes.error);
+        // We still let them in, but they might need to go to an onboarding page
+      }
+
+      router.push(from);
+    } catch (err: any) {
+      setError(err.message || 'An error occurred during login.');
+    } finally {
+      setIsLoading(false);
     }
-
-    setTimeout(() => router.push(from), 800);
   };
 
   const fillDemo = () => {

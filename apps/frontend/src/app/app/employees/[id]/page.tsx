@@ -123,7 +123,7 @@ export default function EmployeeDetailPage() {
 
               <div className="h-64 mb-6">
                 {/* Assuming SignalRadarChart accepts the riskScore components */}
-                <SignalRadarChart score={riskScore} />
+                <SignalRadarChart componentScores={riskScore.component_scores} />
               </div>
 
               {riskScore.top_factors && riskScore.top_factors.length > 0 && (

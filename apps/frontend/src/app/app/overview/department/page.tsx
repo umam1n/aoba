@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Badge } from '@/components/ui/Badge';
@@ -12,7 +12,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
 
-export default function DepartmentDeepDivePage() {
+function DepartmentContent() {
   const searchParams = useSearchParams();
   const dept = searchParams.get('dept') || 'Engineering';
 
@@ -173,5 +173,13 @@ export default function DepartmentDeepDivePage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function DepartmentDeepDivePage() {
+  return (
+    <Suspense fallback={<div className="flex justify-center p-8"><Loader2 className="w-8 h-8 animate-spin text-blue-500" /></div>}>
+      <DepartmentContent />
+    </Suspense>
   );
 }

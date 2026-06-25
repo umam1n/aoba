@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 import { SignalRadarChart } from '@/components/analytics/SignalRadarChart';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { AlertTriangle, Filter, X, ArrowUpDown, Loader2, RefreshCw } from 'lucide-react';
@@ -45,14 +46,13 @@ export default function RiskPage() {
         setLoadingList(false);
       }
     }
-    }
     fetchRiskScores();
   }, []);
 
   const handleRecalculate = async () => {
     setRecalculating(true);
     try {
-      await api.post('/analytics/recalculate/');
+      await api.post<any>('/analytics/recalculate/', {});
       // Re-fetch after a short delay to allow calculation
       setTimeout(async () => {
         try {

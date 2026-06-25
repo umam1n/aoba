@@ -36,7 +36,7 @@ export default function PublicSurveyPage() {
           }
           setResponses(initial);
         } else {
-          setError(res.error || 'Failed to load survey.');
+          setError(res.error?.message || 'Failed to load survey.');
         }
       } catch (err: any) {
         setError(err.message || 'Survey is inactive or not found.');
@@ -67,7 +67,7 @@ export default function PublicSurveyPage() {
 
       const res = await api.post<any>(`/surveys/${id}/submit/`, payload);
       if (res.error) {
-        setError(res.error);
+        setError(res.error.message || 'Failed to submit survey.');
       } else {
         setSubmitted(true);
       }

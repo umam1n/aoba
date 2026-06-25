@@ -1,24 +1,31 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { Shield, FileText, DownloadCloud, Clock, CheckCircle } from 'lucide-react';
-
-const consentLogs = [
-  { id: '1', emp: 'Alice Smith', type: 'Data Collection', status: 'Granted', date: '2026-01-15 09:00', ip: '192.168.1.10' },
-  { id: '2', emp: 'Alice Smith', type: 'Risk Analysis', status: 'Granted', date: '2026-01-15 09:05', ip: '192.168.1.10' },
-  { id: '3', emp: 'Bob Johnson', type: 'Survey Participation', status: 'Revoked', date: '2026-05-10 14:22', ip: '10.0.0.45' },
-];
-
-const auditTrail = [
-  { id: '1', user: 'Admin User', action: 'Exported Risk Report', target: 'Engineering Dept', date: '2026-06-11 16:45' },
-  { id: '2', user: 'System', action: 'Anonymized Data Partition', target: 'Terminated Employees', date: '2026-06-10 00:00' },
-  { id: '3', user: 'HR Manager', action: 'Viewed Profile', target: 'Eve Davis', date: '2026-06-09 11:20' },
-];
+import { Shield, FileText, DownloadCloud, Clock, CheckCircle, Loader2 } from 'lucide-react';
+import { api } from '@/lib/api';
 
 export default function CompliancePage() {
+  const [consentLogs, setConsentLogs] = useState<any[]>([]);
+  const [auditTrail, setAuditTrail] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      setLoading(true);
+      const [consentRes, auditRes] = await Promise.all([
+        api.get<any>('/compliance/consent/'),
+        api.get<any>('/compliance/audit/')
+      ]);
+      
+      if (consentRes.data?.results) setConsentLogs(consentRes.data.results);
+      if (auditRes.data?.results) setAuditTrail(auditRes.data.results);
+      setLoading(false);
+    }
+    fetchData();
+  }, []);
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -64,13 +71,17 @@ export default function CompliancePage() {
               </h3>
             </div>
             <div className="space-y-3">
-              {consentLogs.map(log => (
+              {loading ? (
+                <div className="flex justify-center p-4"><Loader2 className="w-5 h-5 animate-spin text-blue-500" /></div>
+              ) : consentLogs.length === 0 ? (
+                <div className="text-gray-500 text-sm text-center">No consent logs found.</div>
+              ) : consentLogs.map(log => (
                 <div key={log.id} className="flex justify-between items-center p-3 rounded-md bg-white/5 border border-white/10">
                   <div>
-                    <p className="text-sm font-medium text-white">{log.emp} <span className="text-gray-500 font-normal">({log.type})</span></p>
-                    <p className="text-xs text-gray-500 mt-1">{log.date} &bull; IP: {log.ip}</p>
+                    <p className="text-sm font-medium text-white">{log.employee_name || log.employee} <span className="text-gray-500 font-normal">({log.consent_type})</span></p>
+                    <p className="text-xs text-gray-500 mt-1">{new Date(log.granted_at).toLocaleString()} &bull; IP: {log.ip_address}</p>
                   </div>
-                  <Badge variant={log.status === 'Granted' ? 'success' : 'danger'}>{log.status}</Badge>
+                  <Badge variant={log.granted ? 'success' : 'danger'}>{log.granted ? 'Granted' : 'Revoked'}</Badge>
                 </div>
               ))}
             </div>
@@ -84,12 +95,16 @@ export default function CompliancePage() {
               <Button variant="ghost" size="sm" className="text-xs">View All</Button>
             </div>
             <div className="relative border-l border-white/10 ml-3 space-y-4 pb-2">
-              {auditTrail.map((audit) => (
+              {loading ? (
+                <div className="flex justify-center p-4"><Loader2 className="w-5 h-5 animate-spin text-purple-500" /></div>
+              ) : auditTrail.length === 0 ? (
+                <div className="text-gray-500 text-sm pl-4">No audit logs found.</div>
+              ) : auditTrail.map((audit) => (
                 <div key={audit.id} className="relative pl-6">
                   <div className="absolute left-[-5px] top-1.5 w-2 h-2 rounded-full bg-purple-400 ring-4 ring-[#0f172a]" />
-                  <p className="text-sm text-white"><span className="font-medium text-blue-400">{audit.user}</span> {audit.action}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">Target: {audit.target}</p>
-                  <p className="text-[10px] text-gray-500 mt-1">{audit.date}</p>
+                  <p className="text-sm text-white"><span className="font-medium text-blue-400">{audit.user_name || audit.user || 'System'}</span> {audit.action}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Target: {audit.resource_type} {audit.resource_id}</p>
+                  <p className="text-[10px] text-gray-500 mt-1">{new Date(audit.created_at).toLocaleString()}</p>
                 </div>
               ))}
             </div>

@@ -555,7 +555,7 @@ def run_import(company, file_type: str, file_content: bytes, ingestion_log):
     ingestion_log.rows_imported = result['imported']
     ingestion_log.rows_skipped = result['skipped']
     ingestion_log.errors = result['errors']
-    ingestion_log.status = 'completed' if not result['errors'] else 'completed'
+    ingestion_log.status = 'completed' if not result['errors'] else 'completed_with_errors'
     ingestion_log.completed_at = timezone.now()
     ingestion_log.save()
 

@@ -93,6 +93,7 @@ class EmployeeListSerializer(serializers.ModelSerializer):
     """
 
     manager_name = serializers.CharField(source='manager.full_name', read_only=True, default=None)
+    tenure_months = serializers.SerializerMethodField()
 
     class Meta:
         model = Employee
@@ -125,11 +126,18 @@ class EmployeeSerializer(serializers.ModelSerializer):
             'manager', 'manager_name', 'hire_date', 'exit_date',
             'exit_type', 'current_salary', 'employment_status',
             'created_at', 'updated_at',
-            'direct_report_count',
+            'direct_report_count', 'tenure_months',
             'role_history', 'compensation_history', 'leave_records',
             'manager_changes',
         ]
         read_only_fields = ['id', 'company', 'created_at', 'updated_at']
+
+    def get_tenure_months(self, obj):
+        if obj.hire_date:
+            from datetime import date
+            today = date.today()
+            return (today.year - obj.hire_date.year) * 12 + today.month - obj.hire_date.month
+        return 0
 
     def get_direct_report_count(self, obj):
         """Number of employees reporting directly to this employee."""

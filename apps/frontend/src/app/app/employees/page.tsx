@@ -22,6 +22,11 @@ export default function EmployeesPage() {
   
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  const [importType, setImportType] = useState('employees');
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchEmployees() {
@@ -42,6 +47,32 @@ export default function EmployeesPage() {
     e.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
     e.employee_code.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    setUploadError(null);
+    setUploadSuccess(null);
+
+    const { data, error } = await api.upload('/employees/import/', file, {
+      file_type: importType
+    });
+
+    setIsUploading(false);
+
+    if (error) {
+      setUploadError(error.message);
+    } else {
+      setUploadSuccess('File uploaded successfully. Processing in background.');
+      // Optional: Refresh employee list after a short delay
+      setTimeout(() => {
+        // Just trigger a re-render or refetch here if needed
+        window.location.reload();
+      }, 2000);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -170,23 +201,47 @@ export default function EmployeesPage() {
             <p className="text-sm text-gray-400 mb-4">Upload CSV files to sync employee or compensation data.</p>
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-400 mb-1">Data Type</label>
-              <select className="w-full bg-white/5 border border-white/10 rounded-md py-2 px-3 text-white focus:outline-none focus:border-blue-500 text-sm">
+              <select 
+                className="w-full bg-white/5 border border-white/10 rounded-md py-2 px-3 text-white focus:outline-none focus:border-blue-500 text-sm"
+                value={importType}
+                onChange={(e) => setImportType(e.target.value)}
+              >
                 <option value="employees">Employees</option>
                 <option value="compensation_history">Compensation History</option>
                 <option value="role_history">Role History</option>
                 <option value="leave_records">Leave Records</option>
               </select>
             </div>
-            <div className="border-2 border-dashed border-white/20 rounded-lg p-8 flex flex-col items-center justify-center text-center hover:bg-white/5 transition-colors cursor-pointer group">
-              <div className="bg-white/10 p-3 rounded-full mb-3 group-hover:scale-110 transition-transform">
-                <Upload className="w-6 h-6 text-blue-400" />
+            
+            {uploadError && (
+              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400">
+                {uploadError}
               </div>
-              <p className="text-sm text-white font-medium">Click to upload or drag and drop</p>
+            )}
+            {uploadSuccess && (
+              <div className="mb-4 p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-sm text-green-400">
+                {uploadSuccess}
+              </div>
+            )}
+
+            <div className="relative border-2 border-dashed border-white/20 rounded-lg p-8 flex flex-col items-center justify-center text-center hover:bg-white/5 transition-colors cursor-pointer group">
+              <input 
+                type="file" 
+                accept=".csv"
+                onChange={handleFileUpload}
+                disabled={isUploading}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+              />
+              <div className="bg-white/10 p-3 rounded-full mb-3 group-hover:scale-110 transition-transform">
+                {isUploading ? <Loader2 className="w-6 h-6 text-blue-400 animate-spin" /> : <Upload className="w-6 h-6 text-blue-400" />}
+              </div>
+              <p className="text-sm text-white font-medium">
+                {isUploading ? 'Uploading...' : 'Click to upload or drag and drop'}
+              </p>
               <p className="text-xs text-gray-500 mt-1">CSV files only (max 10MB)</p>
             </div>
             <div className="mt-6 flex justify-end gap-3">
-              <Button variant="ghost" onClick={() => setShowImportModal(false)}>Cancel</Button>
-              <Button variant="primary">Upload File</Button>
+              <Button variant="ghost" onClick={() => setShowImportModal(false)}>Close</Button>
             </div>
           </GlassPanel>
         </div>

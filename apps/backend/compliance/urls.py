@@ -1,9 +1,10 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import ConsentLogViewSet, DataExportView, DataCorrectionView, CharterView
+from .views import ConsentLogViewSet, DataExportView, DataCorrectionView, CharterView, AuditLogViewSet
 
 router = DefaultRouter()
 router.register(r'consent', ConsentLogViewSet, basename='consent')
+router.register(r'audit', AuditLogViewSet, basename='audit')
 
 urlpatterns = [
     path('', include(router.urls)),

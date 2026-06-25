@@ -1,50 +1,84 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { Building2, CreditCard, Users, Settings as SettingsIcon, X } from 'lucide-react';
-
-interface TeamMember {
-  email: string;
-  name: string;
-  role: 'Owner' | 'Admin' | 'HR BP' | 'Viewer';
-}
-
-const initialMembers: TeamMember[] = [
-  { name: 'Admin User', email: 'admin@acmecorp.com', role: 'Owner' },
-  { name: 'HR Director', email: 'hr@acmecorp.com', role: 'Admin' },
-  { name: 'Manager JD', email: 'jd@acmecorp.com', role: 'Viewer' }
-];
+import { Building2, CreditCard, Users, Settings as SettingsIcon, X, Loader2 } from 'lucide-react';
+import { api } from '@/lib/api';
 
 export default function SettingsPage() {
-  const [members, setMembers] = useState<TeamMember[]>(initialMembers);
+  const [members, setMembers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState<'Admin' | 'HR BP' | 'Viewer'>('Viewer');
+  const [inviteRole, setInviteRole] = useState('viewer');
 
   // Profile State
-  const [companyName, setCompanyName] = useState('Acme Corp');
+  const [companyId, setCompanyId] = useState<string | null>(null);
+  const [companyName, setCompanyName] = useState('');
   const [industry, setIndustry] = useState('Technology');
   const [timezone, setTimezone] = useState('UTC (GMT+0)');
+  const [saving, setSaving] = useState(false);
 
-  const handleInvite = () => {
-    if (!inviteEmail) return;
+  useEffect(() => {
+    async function fetchData() {
+      setLoading(true);
+      const [companyRes, membersRes] = await Promise.all([
+        api.get<any>('/companies/'),
+        api.get<any>('/companies/memberships/')
+      ]);
+      
+      if (companyRes.data?.results && companyRes.data.results.length > 0) {
+        const comp = companyRes.data.results[0];
+        setCompanyId(comp.id);
+        setCompanyName(comp.name);
+        setIndustry(comp.industry || 'Technology');
+      }
+      
+      if (membersRes.data?.results) {
+        setMembers(membersRes.data.results);
+      }
+      setLoading(false);
+    }
+    fetchData();
+  }, []);
+
+  const handleSaveProfile = async () => {
+    if (!companyId) return;
+    setSaving(true);
+    await api.put(`/companies/${companyId}/`, {
+      name: companyName,
+      industry: industry,
+    });
+    setSaving(false);
+  };
+
+  const handleInvite = async () => {
+    if (!inviteEmail || !companyId) return;
     
-    const newMember: TeamMember = {
-      name: 'Pending Invite',
-      email: inviteEmail,
-      role: inviteRole
-    };
+    // Using a fake user ID for now since the backend requires it, but in real flow this might be an invite email logic
+    const { data } = await api.post<any>('/companies/memberships/', {
+      company: companyId,
+      role: inviteRole,
+      user_email: inviteEmail // Assuming backend accepts this or we just send an invite email
+    });
     
-    setMembers([...members, newMember]);
+    if (data) {
+      setMembers([...members, data]);
+    }
+    
     setInviteEmail('');
     setShowInviteModal(false);
   };
 
-  const handleRoleChange = (email: string, newRole: TeamMember['role']) => {
-    setMembers(members.map(m => m.email === email ? { ...m, role: newRole } : m));
+  const handleRoleChange = async (memberId: string, newRole: string) => {
+    const { data } = await api.put<any>(`/companies/memberships/${memberId}/`, {
+      role: newRole
+    });
+    if (data) {
+      setMembers(members.map(m => m.id === memberId ? data : m));
+    }
   };
 
   return (
@@ -79,14 +113,14 @@ export default function SettingsPage() {
               <div className="space-y-1">
                 <label className="text-sm font-medium text-gray-400">Industry</label>
                 <select 
-                  value={industry}
-                  onChange={e => setIndustry(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-md py-2 px-3 text-white focus:outline-none focus:border-blue-500"
-                >
-                  <option>Technology</option>
-                  <option>Finance</option>
-                  <option>Healthcare</option>
-                </select>
+                value={inviteRole}
+                onChange={e => setInviteRole(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-md py-2 px-3 text-white focus:outline-none focus:border-blue-500"
+              >
+                <option value="hr_admin">Admin</option>
+                <option value="manager">Manager</option>
+                <option value="employee">Employee</option>
+              </select>
               </div>
               <div className="space-y-1">
                 <label className="text-sm font-medium text-gray-400">Timezone</label>
@@ -101,8 +135,10 @@ export default function SettingsPage() {
                 </select>
               </div>
             </div>
-            <div className="mt-6 flex justify-end">
-              <Button variant="primary">Save Changes</Button>
+            <div className="flex justify-end mt-6 pt-6 border-t border-white/10">
+              <Button variant="primary" onClick={handleSaveProfile} disabled={saving || loading}>
+                {saving ? 'Saving...' : 'Save Changes'}
+              </Button>
             </div>
           </GlassPanel>
 
@@ -116,27 +152,31 @@ export default function SettingsPage() {
             </div>
             
             <div className="space-y-4">
-              {members.map(user => (
-                <div key={user.email} className="flex justify-between items-center p-3 rounded-md bg-white/5 border border-white/10">
-                  <div>
-                    <p className="text-sm font-medium text-white">{user.name}</p>
-                    <p className="text-xs text-gray-400">{user.email}</p>
+              {loading ? (
+                 <div className="flex justify-center p-4"><Loader2 className="w-5 h-5 animate-spin text-blue-500" /></div>
+              ) : members.length === 0 ? (
+                 <div className="text-gray-500 text-sm">No members found.</div>
+              ) : members.map((member, i) => (
+                <div key={member.id || i} className="flex items-center justify-between p-3 rounded-md bg-white/5 border border-white/10">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500/40 to-purple-500/40 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                      {(member.user_name || 'U').charAt(0)}
+                    </div>
+                    <div>
+                      <div className="font-medium text-white text-sm">{member.user_name || 'User'}</div>
+                      <div className="text-xs text-gray-500">{member.user_email || 'No email'}</div>
+                    </div>
                   </div>
                   <div className="flex items-center gap-4">
-                    {user.role === 'Owner' ? (
-                      <span className="text-xs text-gray-500 pr-2">Owner</span>
-                    ) : (
-                      <select 
-                        value={user.role}
-                        onChange={(e) => handleRoleChange(user.email, e.target.value as TeamMember['role'])}
-                        className="bg-transparent text-xs text-gray-300 focus:outline-none border-b border-transparent hover:border-gray-500 cursor-pointer"
-                      >
-                        <option value="Admin">Admin</option>
-                        <option value="HR BP">HR BP</option>
-                        <option value="Viewer">Viewer</option>
-                      </select>
-                    )}
-                    <button className="text-gray-400 hover:text-white transition-colors"><SettingsIcon className="w-4 h-4" /></button>
+                    <select 
+                      value={member.role}
+                      onChange={e => handleRoleChange(member.id, e.target.value)}
+                      className="bg-transparent text-sm text-gray-300 border-none focus:ring-0 cursor-pointer outline-none"
+                    >
+                      <option value="hr_admin">Admin</option>
+                      <option value="manager">Manager</option>
+                      <option value="employee">Employee</option>
+                    </select>
                   </div>
                 </div>
               ))}

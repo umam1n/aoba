@@ -43,6 +43,21 @@ class ConsentLogViewSet(AuditLogMixin, viewsets.ModelViewSet):
             user_agent=self.request.META.get('HTTP_USER_AGENT', '')
         )
 
+    def _get_client_ip(self, request):
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            return x_forwarded_for.split(',')[0]
+        return request.META.get('REMOTE_ADDR')
+
+
+class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = AuditLogSerializer
+    permission_classes = [IsHRAdmin]
+
+    def get_queryset(self):
+        company = self.request.company
+        return AuditLog.objects.filter(company=company).order_by('-created_at')
+
 
 class DataExportView(views.APIView):
     """

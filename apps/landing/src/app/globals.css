@@ -1,0 +1,69 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+:root {
+  /* Light Theme */
+  --background: #FAFAFA;
+  --foreground: #0A0414;
+  --panel-bg: rgba(255, 255, 255, 0.7);
+  --panel-border: rgba(124, 58, 237, 0.1);
+  
+  /* Violet Palette */
+  --violet-50: #F5F3FF;
+  --violet-100: #EDE9FE;
+  --violet-200: #DDD6FE;
+  --violet-300: #C4B5FD;
+  --violet-400: #A78BFA;
+  --violet-500: #8B5CF6;
+  --violet-600: #7C3AED;
+  --violet-700: #6D28D9;
+  --violet-800: #5B21B6;
+  --violet-900: #4C1D95;
+  --violet-950: #2E1065;
+}
+
+[data-theme="dark"] {
+  --background: #0A0414;
+  --foreground: #FAFAFA;
+  --panel-bg: rgba(20, 10, 30, 0.5);
+  --panel-border: rgba(124, 58, 237, 0.2);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --background: #0A0414;
+    --foreground: #FAFAFA;
+    --panel-bg: rgba(20, 10, 30, 0.5);
+    --panel-border: rgba(124, 58, 237, 0.2);
+  }
+}
+
+html {
+  height: 100%;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-inter), Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Glass Utilities */
+.glass {
+  background: var(--panel-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--panel-border);
+}

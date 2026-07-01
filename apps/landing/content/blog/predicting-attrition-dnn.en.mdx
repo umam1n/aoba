@@ -1,0 +1,28 @@
+---
+title: "Predicting Attrition with Deep Neural Networks"
+date: "2026-06-20"
+author: "Engineering Team"
+category: "AI & Analytics"
+tags: ["dnn", "machine-learning", "hr-tech"]
+excerpt: "How AOBA combines rule-based engines with Deep Neural Networks to provide 92% accuracy in 90-day attrition prediction."
+lang: "en"
+readTime: 6
+featured: false
+---
+
+# Predicting Attrition with Deep Neural Networks
+
+Attrition is a complex, multi-variate problem. Rule-based systems are great for capturing obvious correlations (like low salary + long tenure = high risk), but they fail to capture the subtle, non-linear relationships that drive human behavior.
+
+This is why AOBA uses a dual-engine architecture.
+
+## The Dual-Engine Architecture
+
+1. **Rule-Based Baseline:** We start with structural HR signals (compensation bands, tenure, leave usage) to establish a baseline risk score. This provides 100% explainability.
+2. **DNN Refinement:** Our Deep Neural Network analyzes sequential data (like the frequency of manager changes, the historical trajectory of peer departures, and sentiment shifts in pulse surveys) to uncover hidden patterns.
+
+### Why Explainability Matters in HR
+
+A black-box model that says "Employee X has a 90% risk of leaving" is useless to an HRBP. They need to know *why* so they can take action. 
+
+AOBA's DNN utilizes SHAP (SHapley Additive exPlanations) values to translate complex neural network outputs into human-readable factors. The result? A dashboard that not only predicts flight risk, but tells the HRBP exactly which levers to pull to prevent it.

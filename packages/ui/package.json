@@ -1,0 +1,12 @@
+{
+  "name": "@aoba/ui",
+  "version": "1.0.0",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "peerDependencies": {
+    "react": "^18 || ^19",
+    "react-dom": "^18 || ^19",
+    "lucide-react": "^0.x || ^1.x",
+    "clsx": "^2.x"
+  }
+}
